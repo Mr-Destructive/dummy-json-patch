@@ -132,13 +132,14 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 				Body: err.Error(),
 			}, nil
 		}
+		createdUser, err := queries.GetUser(context.Background(), int64(user.ID))
 
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusOK,
 			Headers: map[string]string{
 				"Content-Type": "application/json",
 			},
-			Body: fmt.Sprintf("%+v", user),
+			Body: fmt.Sprintf("%+v", createdUser),
 		}, nil
 
 	} else if req.HTTPMethod == "PATCH" {
