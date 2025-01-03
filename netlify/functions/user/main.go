@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -51,7 +53,12 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		log.Fatal(err)
 	}
 
-	users, err := queries.ListUsers(ctx)
+	userIdStr := req.QueryStringParameters["id"]
+	userId, err := strconv.ParseInt(userIdStr, 10, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+	user, err := queries.GetUser(ctx, userId)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,7 +68,36 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		Headers: map[string]string{
 			"Content-Type": "application/json",
 		},
-		Body: fmt.Sprintf("%+v", users),
+		Body: fmt.Sprintf("%+v", user),
 	}, nil
 
+}
+
+func getUserhandler(w http.ResponseWriter, r *http.Request, id int) {
+	if id == 0 {
+		http.Error(w, "User ID is required", http.StatusBadRequest)
+		return
+	}
+
+	user, err := queries.GetUser(context.Background(), int64(id))
+	if err == sql.ErrNoRows {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	userResponse := data.User{
+		ID:    int64(user.ID),
+		Name:  user.Name,
+		Email: user.Email,
+		Roles: sql.NullString{
+			String: user.Roles.String,
+			Valid:  true,
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(userResponse)
 }
