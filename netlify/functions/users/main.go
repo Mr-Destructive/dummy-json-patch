@@ -41,7 +41,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 	dbToken := os.Getenv("DB_TOKEN")
 
 	var err error
-	dbString := fmt.Sprintf("libsql://%s?token=%s", dbName, dbToken)
+	dbString := fmt.Sprintf("libsql://%s?authToken=%s", dbName, dbToken)
 	db, err = sql.Open("libsql", dbString)
 	if err != nil {
 		log.Fatal(err)
