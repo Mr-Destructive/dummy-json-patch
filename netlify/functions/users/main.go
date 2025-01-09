@@ -214,12 +214,21 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 					Body: err.Error(),
 				}, nil
 			}
+			var updatedUserJson string
+			type userJson struct {
+				ID    int64  `json:"id"`
+				Name  string `json:"name"`
+				Email string `json:"email"`
+				Roles string `json:"roles"`
+			}
+			var userJsonBody userJson
+			json.Unmarshal([]byte(updatedUserJson), &userJsonBody)
 			return events.APIGatewayProxyResponse{
 				StatusCode: http.StatusOK,
 				Headers: map[string]string{
 					"Content-Type": "application/json",
 				},
-				Body: fmt.Sprintf("%+v", updatedUser),
+				Body: updatedUserJson,
 			}, nil
 		}
 
