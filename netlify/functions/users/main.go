@@ -70,24 +70,26 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 			if err != nil {
 				log.Fatal(err)
 			}
+			jsonUser := jsonify(user)
 			return events.APIGatewayProxyResponse{
 				StatusCode: http.StatusOK,
 				Headers: map[string]string{
 					"Content-Type": "application/json",
 				},
-				Body: fmt.Sprintf("%+v", user),
+				Body: jsonUser,
 			}, nil
 		} else {
 			users, err := queries.ListUsers(ctx)
 			if err != nil {
 				log.Fatal(err)
 			}
+			jsonUsers := jsonify(users)
 			return events.APIGatewayProxyResponse{
 				StatusCode: http.StatusOK,
 				Headers: map[string]string{
 					"Content-Type": "application/json",
 				},
-				Body: fmt.Sprintf("%+v", users),
+				Body: jsonUsers,
 			}, nil
 		}
 	} else if req.HTTPMethod == "POST" {
@@ -134,12 +136,13 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		}
 		createdUser, err := queries.GetUser(context.Background(), int64(user.ID))
 
+		jsonUser := jsonify(createdUser)
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusOK,
 			Headers: map[string]string{
 				"Content-Type": "application/json",
 			},
-			Body: fmt.Sprintf("%+v", createdUser),
+			Body: jsonUser,
 		}, nil
 
 	} else if req.HTTPMethod == "PATCH" {
@@ -273,4 +276,12 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		Body: fmt.Sprintf("%+v", users),
 	}, nil
 
+}
+
+func jsonify(user any) string {
+	userJson, err := json.Marshal(user)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return string(userJson)
 }
