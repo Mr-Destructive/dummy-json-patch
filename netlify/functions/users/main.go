@@ -204,7 +204,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 			if err != nil {
 			}
 
-			updatedUser, err := queries.GetUser(context.Background(), int64(userId))
+			//updatedUser, err := queries.GetUser(context.Background(), int64(userId))
 			if err != nil {
 				return events.APIGatewayProxyResponse{
 					StatusCode: http.StatusInternalServerError,
