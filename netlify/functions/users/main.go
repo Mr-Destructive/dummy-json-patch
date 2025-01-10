@@ -149,131 +149,99 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 
 		if req.Headers["Content-Type"] == "application/json-patch+json" {
 
-			_, err := queries.GetUser(context.Background(), userId)
-			log.Println("fetch user:", err)
+			existingUser, err := queries.GetUser(context.Background(), userId)
 			if err != nil {
-				return events.APIGatewayProxyResponse{
-					StatusCode: http.StatusNotFound,
-					Headers: map[string]string{
-						"Content-Type": "application/json",
-					},
-					Body: err.Error(),
-				}, nil
+				return errorResponse(http.StatusNotFound, "User not found"), nil
 			}
-			var patchOps []jsonpatch.Operation
 
+			var patchOps []jsonpatch.Operation
 			if err := json.Unmarshal([]byte(req.Body), &patchOps); err != nil {
-				log.Println("unmarshal error:", err)
-				return events.APIGatewayProxyResponse{
-					StatusCode: http.StatusBadRequest,
-					Headers: map[string]string{
-						"Content-Type": "application/json",
-					},
-					Body: err.Error(),
-				}, nil
+				return errorResponse(http.StatusBadRequest, "Invalid JSON Patch format"), nil
 			}
-			updateParts := []string{}
-			updateArgs := []interface{}{}
+
+			updateParts := make([]string, 0)
+			updateArgs := make([]interface{}, 0)
+
+			allowedPaths := map[string]struct{}{
+				"/name":  {},
+				"/email": {},
+				"/roles": {},
+			}
 
 			for _, op := range patchOps {
 				if op.Kind() != "replace" {
-					continue
+					return errorResponse(http.StatusBadRequest,
+						fmt.Sprintf("Operation '%s' not supported. Only 'replace' is allowed", op.Kind())), nil
 				}
+
 				path, err := op.Path()
-				log.Println("path:", err)
 				if err != nil {
-					return events.APIGatewayProxyResponse{
-						StatusCode: http.StatusBadRequest,
-						Headers: map[string]string{
-							"Content-Type": "application/json",
-						},
-						Body: err.Error(),
-					}, nil
+					return errorResponse(http.StatusBadRequest, "Invalid path in patch operation"), nil
 				}
+
+				if _, ok := allowedPaths[path]; !ok {
+					return errorResponse(http.StatusBadRequest,
+						fmt.Sprintf("Path '%s' is not allowed", path)), nil
+				}
+
 				value, err := op.ValueInterface()
-				log.Println("value:", err)
 				if err != nil {
-					return events.APIGatewayProxyResponse{
-						StatusCode: http.StatusBadRequest,
-						Headers: map[string]string{
-							"Content-Type": "application/json",
-						},
-						Body: err.Error(),
-					}, nil
+					return errorResponse(http.StatusBadRequest, "Invalid value in patch operation"), nil
 				}
 
 				switch path {
 				case "/name":
+					strValue, ok := value.(string)
+					if !ok || strValue == "" {
+						return errorResponse(http.StatusBadRequest, "Name must be a non-empty string"), nil
+					}
 					updateParts = append(updateParts, "name = ?")
-					updateArgs = append(updateArgs, value)
+					updateArgs = append(updateArgs, strValue)
+
 				case "/email":
+					strValue, ok := value.(string)
+					if !ok || strValue == "" {
+						return errorResponse(http.StatusBadRequest, "Invalid email format"), nil
+					}
 					updateParts = append(updateParts, "email = ?")
-					updateArgs = append(updateArgs, value)
+					updateArgs = append(updateArgs, strValue)
+
 				case "/roles":
+					strValue, ok := value.(string)
+					if !ok {
+						return errorResponse(http.StatusBadRequest, "Roles must be a string"), nil
+					}
 					updateParts = append(updateParts, "roles = ?")
-					updateArgs = append(updateArgs, sql.NullString{String: value.(string), Valid: true})
+					updateArgs = append(updateArgs, sql.NullString{String: strValue, Valid: true})
 				}
 			}
 
-			if len(updateParts) > 0 {
-				query := fmt.Sprintf("UPDATE users SET %s WHERE id = ?", strings.Join(updateParts, ", "))
-				updateArgs = append(updateArgs, userId)
-
-				_, err = db.ExecContext(context.Background(), query, updateArgs...)
-				log.Println("update user:", err)
-				if err != nil {
-				}
-
-				updatedUser, err := queries.GetUser(context.Background(), int64(userId))
-				if err != nil {
-					return events.APIGatewayProxyResponse{
-						StatusCode: http.StatusInternalServerError,
-						Headers: map[string]string{
-							"Content-Type": "application/json",
-						},
-						Body: err.Error(),
-					}, nil
-				}
-				type userJson struct {
-					ID    int64  `json:"id"`
-					Name  string `json:"name"`
-					Email string `json:"email"`
-					Roles string `json:"roles"`
-				}
-				var userJsonBody userJson
-				userJsonBody.ID = updatedUser.ID
-				userJsonBody.Name = updatedUser.Name
-				userJsonBody.Email = updatedUser.Email
-				userJsonBody.Roles = updatedUser.Roles.String
-
-				updatedUserJson, err := json.Marshal(userJsonBody)
-				log.Println("updated user json:", err)
-				if err != nil {
-					return events.APIGatewayProxyResponse{
-						StatusCode: http.StatusInternalServerError,
-						Headers: map[string]string{
-							"Content-Type": "application/json",
-						},
-						Body: err.Error(),
-					}, nil
-				}
-
+			if len(updateParts) == 0 {
 				return events.APIGatewayProxyResponse{
 					StatusCode: http.StatusOK,
-					Headers: map[string]string{
-						"Content-Type": "application/json",
-					},
-					Body: string(updatedUserJson),
+					Headers:    map[string]string{"Content-Type": "application/json"},
+					Body:       string(formatUserResponse(existingUser)),
 				}, nil
+			}
+
+			query := fmt.Sprintf("UPDATE users SET %s WHERE id = ?", strings.Join(updateParts, ", "))
+			updateArgs = append(updateArgs, userId)
+
+			if _, err := db.ExecContext(context.Background(), query, updateArgs...); err != nil {
+				return errorResponse(http.StatusInternalServerError, "Failed to update user"), nil
+			}
+
+			updatedUser, err := queries.GetUser(context.Background(), userId)
+			if err != nil {
+				return errorResponse(http.StatusInternalServerError, "Failed to fetch updated user"), nil
 			}
 
 			return events.APIGatewayProxyResponse{
 				StatusCode: http.StatusOK,
-				Headers: map[string]string{
-					"Content-Type": "application/json",
-				},
-				Body: "",
+				Headers:    map[string]string{"Content-Type": "application/json"},
+				Body:       string(formatUserResponse(updatedUser)),
 			}, nil
+
 		} else {
 			var updates map[string]interface{}
 			if err := json.Unmarshal([]byte(req.Body), &updates); err != nil {
@@ -369,4 +337,21 @@ func validateUserUpdate(user data.UpdateUserParams) error {
 		return fmt.Errorf("invalid email format")
 	}
 	return nil
+}
+
+func formatUserResponse(user data.GetUserRow) []byte {
+	response := struct {
+		ID    int64  `json:"id"`
+		Name  string `json:"name"`
+		Email string `json:"email"`
+		Roles string `json:"roles"`
+	}{
+		ID:    user.ID,
+		Name:  user.Name,
+		Email: user.Email,
+		Roles: user.Roles.String,
+	}
+
+	bytes, _ := json.Marshal(response)
+	return bytes
 }
