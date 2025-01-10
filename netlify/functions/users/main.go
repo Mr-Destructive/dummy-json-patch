@@ -177,8 +177,9 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		}, nil
 
 	} else if req.HTTPMethod == "PATCH" {
-		fmt.Println(req.Headers["Content-Type"])
-		if req.Headers["Content-Type"] == "application/json-patch+json" {
+		contentType := getHeader(req.Headers, "Content-Type")
+		log.Printf("Content-Type: %s", contentType)
+		if contentType == "application/json-patch+json" {
 
 			existingUser, err := queries.GetUser(context.Background(), userId)
 			if err != nil {
@@ -392,4 +393,18 @@ func formatUserResponse(user data.GetUserRow) []byte {
 
 	bytes, _ := json.Marshal(response)
 	return bytes
+}
+
+func getHeader(headers map[string]string, key string) string {
+	if val, ok := headers[key]; ok {
+		return val
+	}
+
+	lowerKey := strings.ToLower(key)
+	for k, v := range headers {
+		if strings.ToLower(k) == lowerKey {
+			return v
+		}
+	}
+	return ""
 }
