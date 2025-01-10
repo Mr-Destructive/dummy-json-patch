@@ -178,7 +178,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 
 	} else if req.HTTPMethod == "PATCH" {
 		fmt.Println(req.Headers["Content-Type"])
-		if merge == "false" || req.Headers["Content-Type"] == "application/json-patch+json" {
+		if req.Headers["Content-Type"] == "application/json-patch+json" {
 
 			existingUser, err := queries.GetUser(context.Background(), userId)
 			if err != nil {
