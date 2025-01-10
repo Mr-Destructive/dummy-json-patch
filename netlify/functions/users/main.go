@@ -150,6 +150,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		if req.Headers["Content-Type"] == "application/json-patch+json" {
 
 			_, err := queries.GetUser(context.Background(), userId)
+			log.Println("fetch user:", err)
 			if err != nil {
 				return events.APIGatewayProxyResponse{
 					StatusCode: http.StatusNotFound,
@@ -162,6 +163,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 			var patchOps []jsonpatch.Operation
 
 			if err := json.Unmarshal([]byte(req.Body), &patchOps); err != nil {
+				log.Println("unmarshal error:", err)
 				return events.APIGatewayProxyResponse{
 					StatusCode: http.StatusBadRequest,
 					Headers: map[string]string{
@@ -178,6 +180,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 					continue
 				}
 				path, err := op.Path()
+				log.Println("path:", err)
 				if err != nil {
 					return events.APIGatewayProxyResponse{
 						StatusCode: http.StatusBadRequest,
@@ -188,6 +191,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 					}, nil
 				}
 				value, err := op.ValueInterface()
+				log.Println("value:", err)
 				if err != nil {
 					return events.APIGatewayProxyResponse{
 						StatusCode: http.StatusBadRequest,
@@ -216,6 +220,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 				updateArgs = append(updateArgs, userId)
 
 				_, err = db.ExecContext(context.Background(), query, updateArgs...)
+				log.Println("update user:", err)
 				if err != nil {
 				}
 
@@ -242,6 +247,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 				userJsonBody.Roles = updatedUser.Roles.String
 
 				updatedUserJson, err := json.Marshal(userJsonBody)
+				log.Println("updated user json:", err)
 				if err != nil {
 					return events.APIGatewayProxyResponse{
 						StatusCode: http.StatusInternalServerError,
