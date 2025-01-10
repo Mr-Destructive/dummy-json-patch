@@ -60,8 +60,11 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 	if userIdStr != "" {
 		userId, _ = strconv.ParseInt(userIdStr, 10, 64)
 	}
-	var merge string = "false"
+	var merge string
 	merge = req.QueryStringParameters["merge"]
+	if merge == "" {
+		merge = "false"
+	}
 
 	if req.HTTPMethod == "GET" {
 		if userIdStr != "" {
