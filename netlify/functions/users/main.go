@@ -27,6 +27,12 @@ type UserPayload struct {
 	Password string `json:"password"`
 }
 
+type UserUpdatePayload struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Roles string `json:"roles"`
+}
+
 var (
 	queries *data.Queries
 	db      *sql.DB
@@ -101,24 +107,12 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 
 		var userPayload UserPayload
 		if err := json.Unmarshal([]byte(req.Body), &userPayload); err != nil {
-			return events.APIGatewayProxyResponse{
-				StatusCode: http.StatusBadRequest,
-				Headers: map[string]string{
-					"Content-Type": "application/json",
-				},
-				Body: err.Error(),
-			}, nil
+			return errorResponse(http.StatusBadRequest, err.Error()), nil
 		}
 
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userPayload.Password), bcrypt.DefaultCost)
 		if err != nil {
-			return events.APIGatewayProxyResponse{
-				StatusCode: http.StatusInternalServerError,
-				Headers: map[string]string{
-					"Content-Type": "application/json",
-				},
-				Body: err.Error(),
-			}, nil
+			return errorResponse(http.StatusBadRequest, err.Error()), nil
 		}
 
 		user, err := queries.CreateUser(context.Background(), data.CreateUserParams{
@@ -131,17 +125,49 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 			PasswordHash: string(hashedPassword),
 		})
 		if err != nil {
-			return events.APIGatewayProxyResponse{
-				StatusCode: http.StatusInternalServerError,
-				Headers: map[string]string{
-					"Content-Type": "application/json",
-				},
-				Body: err.Error(),
-			}, nil
+			return errorResponse(http.StatusBadRequest, err.Error()), nil
 		}
 		createdUser, err := queries.GetUser(context.Background(), int64(user.ID))
 
 		jsonUser := jsonify(createdUser)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusOK,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: jsonUser,
+		}, nil
+	} else if req.HTTPMethod == "PUT" {
+
+		var userPayload UserUpdatePayload
+		if err := json.Unmarshal([]byte(req.Body), &userPayload); err != nil {
+			return errorResponse(http.StatusBadRequest, err.Error()), nil
+		}
+
+		if err := validateUserUpdate(data.UpdateUserParams{
+			Name:  userPayload.Name,
+			Email: userPayload.Email,
+			Roles: sql.NullString{
+				String: userPayload.Roles,
+				Valid:  true,
+			},
+		}); err != nil {
+			return errorResponse(http.StatusBadRequest, err.Error()), nil
+		}
+		err := queries.UpdateUser(context.Background(), data.UpdateUserParams{
+			ID:    userId,
+			Name:  userPayload.Name,
+			Email: userPayload.Email,
+			Roles: sql.NullString{
+				String: userPayload.Roles,
+				Valid:  true,
+			},
+		})
+		if err != nil {
+			return errorResponse(http.StatusBadRequest, err.Error()), nil
+		}
+		updatedUser, err := queries.GetUser(context.Background(), userId)
+		jsonUser := jsonify(updatedUser)
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusOK,
 			Headers: map[string]string{
