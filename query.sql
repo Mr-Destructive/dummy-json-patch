@@ -10,3 +10,5 @@ UPDATE users SET name = ?, email = ?, roles = ? WHERE id = ?;
 -- name: ListUsers :many
 SELECT id, name, email, roles from users;
 
+-- name: DeleteUser :exec
+DELETE FROM users WHERE id = ?;
