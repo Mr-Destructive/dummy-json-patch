@@ -147,7 +147,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 
 	} else if req.HTTPMethod == "PATCH" {
 
-		if req.Headers["Content-Type"] != "application/json-patch+json" {
+		if req.Headers["Content-Type"] == "application/json-patch+json" {
 
 			_, err := queries.GetUser(context.Background(), userId)
 			if err == sql.ErrNoRows {
