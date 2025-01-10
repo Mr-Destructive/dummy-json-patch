@@ -247,7 +247,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		} else {
 			var updates map[string]interface{}
 			if err := json.Unmarshal([]byte(req.Body), &updates); err != nil {
-				return errorResponse(http.StatusBadRequest, "Invalid JSON"), nil
+				return errorResponse(http.StatusBadRequest, err.Error()), nil
 			}
 
 			var updateParts []string
@@ -296,6 +296,23 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		}
 
 	} else if req.HTTPMethod == "DELETE" {
+		err := queries.DeleteUser(context.Background(), userId)
+		if err != nil {
+			return events.APIGatewayProxyResponse{
+				StatusCode: http.StatusInternalServerError,
+				Headers: map[string]string{
+					"Content-Type": "application/json",
+				},
+				Body: err.Error(),
+			}, nil
+		}
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusOK,
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+			},
+			Body: "User deleted",
+		}, nil
 	} else {
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusMethodNotAllowed,
@@ -305,14 +322,6 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 			Body: "Method not allowed",
 		}, nil
 	}
-
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Headers: map[string]string{
-			"Content-Type": "application/json",
-		},
-		Body: fmt.Sprintf("%+v", users),
-	}, nil
 
 }
 
