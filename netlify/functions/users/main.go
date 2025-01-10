@@ -81,26 +81,28 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 			if err != nil {
 				log.Fatal(err)
 			}
-			jsonUser := jsonify(user)
 			return events.APIGatewayProxyResponse{
 				StatusCode: http.StatusOK,
 				Headers: map[string]string{
 					"Content-Type": "application/json",
 				},
-				Body: jsonUser,
+				Body: string(formatUserResponse(user)),
 			}, nil
 		} else {
 			users, err := queries.ListUsers(ctx)
 			if err != nil {
 				log.Fatal(err)
 			}
-			jsonUsers := jsonify(users)
+			usersJson, err := json.Marshal(users)
+			if err != nil {
+				log.Fatal(err)
+			}
 			return events.APIGatewayProxyResponse{
 				StatusCode: http.StatusOK,
 				Headers: map[string]string{
 					"Content-Type": "application/json",
 				},
-				Body: jsonUsers,
+				Body: string(usersJson),
 			}, nil
 		}
 	} else if req.HTTPMethod == "POST" {
@@ -129,13 +131,12 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		}
 		createdUser, err := queries.GetUser(context.Background(), int64(user.ID))
 
-		jsonUser := jsonify(createdUser)
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusOK,
 			Headers: map[string]string{
 				"Content-Type": "application/json",
 			},
-			Body: jsonUser,
+			Body: string(formatUserResponse(createdUser)),
 		}, nil
 	} else if req.HTTPMethod == "PUT" {
 
@@ -167,13 +168,12 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 			return errorResponse(http.StatusBadRequest, err.Error()), nil
 		}
 		updatedUser, err := queries.GetUser(context.Background(), userId)
-		jsonUser := jsonify(updatedUser)
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusOK,
 			Headers: map[string]string{
 				"Content-Type": "application/json",
 			},
-			Body: jsonUser,
+			Body: string(formatUserResponse(updatedUser)),
 		}, nil
 
 	} else if req.HTTPMethod == "PATCH" {
@@ -313,14 +313,12 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 				return errorResponse(http.StatusInternalServerError, "Failed to get updated user"), nil
 			}
 
-			jsonUser := jsonify(updatedUser)
-
 			return events.APIGatewayProxyResponse{
 				StatusCode: http.StatusOK,
 				Headers: map[string]string{
 					"Content-Type": "application/json",
 				},
-				Body: jsonUser,
+				Body: string(formatUserResponse(updatedUser)),
 			}, nil
 		}
 
