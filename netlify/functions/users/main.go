@@ -150,15 +150,25 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		if req.Headers["Content-Type"] == "application/json-patch+json" {
 
 			_, err := queries.GetUser(context.Background(), userId)
-			if err == sql.ErrNoRows {
-			} else if err != nil {
-			}
-
 			if err != nil {
+				return events.APIGatewayProxyResponse{
+					StatusCode: http.StatusNotFound,
+					Headers: map[string]string{
+						"Content-Type": "application/json",
+					},
+					Body: err.Error(),
+				}, nil
 			}
 			var patchOps []jsonpatch.Operation
 
 			if err := json.Unmarshal([]byte(req.Body), &patchOps); err != nil {
+				return events.APIGatewayProxyResponse{
+					StatusCode: http.StatusBadRequest,
+					Headers: map[string]string{
+						"Content-Type": "application/json",
+					},
+					Body: err.Error(),
+				}, nil
 			}
 			updateParts := []string{}
 			updateArgs := []interface{}{}
