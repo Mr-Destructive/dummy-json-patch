@@ -147,96 +147,107 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 
 	} else if req.HTTPMethod == "PATCH" {
 
-		_, err := queries.GetUser(context.Background(), userId)
-		if err == sql.ErrNoRows {
-		} else if err != nil {
-		}
+		if req.Headers["Content-Type"] != "application/json-patch+json" {
 
-		if err != nil {
-		}
-		var patchOps []jsonpatch.Operation
-
-		if err := json.Unmarshal([]byte(req.Body), &patchOps); err != nil {
-		}
-		updateParts := []string{}
-		updateArgs := []interface{}{}
-
-		for _, op := range patchOps {
-			if op.Kind() != "replace" {
-				continue
+			_, err := queries.GetUser(context.Background(), userId)
+			if err == sql.ErrNoRows {
+			} else if err != nil {
 			}
-			path, err := op.Path()
+
 			if err != nil {
+			}
+			var patchOps []jsonpatch.Operation
+
+			if err := json.Unmarshal([]byte(req.Body), &patchOps); err != nil {
+			}
+			updateParts := []string{}
+			updateArgs := []interface{}{}
+
+			for _, op := range patchOps {
+				if op.Kind() != "replace" {
+					continue
+				}
+				path, err := op.Path()
+				if err != nil {
+					return events.APIGatewayProxyResponse{
+						StatusCode: http.StatusBadRequest,
+						Headers: map[string]string{
+							"Content-Type": "application/json",
+						},
+						Body: err.Error(),
+					}, nil
+				}
+				value, err := op.ValueInterface()
+				if err != nil {
+					return events.APIGatewayProxyResponse{
+						StatusCode: http.StatusBadRequest,
+						Headers: map[string]string{
+							"Content-Type": "application/json",
+						},
+						Body: err.Error(),
+					}, nil
+				}
+
+				switch path {
+				case "/name":
+					updateParts = append(updateParts, "name = ?")
+					updateArgs = append(updateArgs, value)
+				case "/email":
+					updateParts = append(updateParts, "email = ?")
+					updateArgs = append(updateArgs, value)
+				case "/roles":
+					updateParts = append(updateParts, "roles = ?")
+					updateArgs = append(updateArgs, sql.NullString{String: value.(string), Valid: true})
+				}
+			}
+
+			if len(updateParts) > 0 {
+				query := fmt.Sprintf("UPDATE users SET %s WHERE id = ?", strings.Join(updateParts, ", "))
+				updateArgs = append(updateArgs, userId)
+
+				_, err = db.ExecContext(context.Background(), query, updateArgs...)
+				if err != nil {
+				}
+
+				updatedUser, err := queries.GetUser(context.Background(), int64(userId))
+				if err != nil {
+					return events.APIGatewayProxyResponse{
+						StatusCode: http.StatusInternalServerError,
+						Headers: map[string]string{
+							"Content-Type": "application/json",
+						},
+						Body: err.Error(),
+					}, nil
+				}
+				type userJson struct {
+					ID    int64  `json:"id"`
+					Name  string `json:"name"`
+					Email string `json:"email"`
+					Roles string `json:"roles"`
+				}
+				var userJsonBody userJson
+				userJsonBody.ID = updatedUser.ID
+				userJsonBody.Name = updatedUser.Name
+				userJsonBody.Email = updatedUser.Email
+				userJsonBody.Roles = updatedUser.Roles.String
+
+				updatedUserJson, err := json.Marshal(userJsonBody)
+				if err != nil {
+					return events.APIGatewayProxyResponse{
+						StatusCode: http.StatusInternalServerError,
+						Headers: map[string]string{
+							"Content-Type": "application/json",
+						},
+						Body: err.Error(),
+					}, nil
+				}
+
 				return events.APIGatewayProxyResponse{
-					StatusCode: http.StatusBadRequest,
+					StatusCode: http.StatusOK,
 					Headers: map[string]string{
 						"Content-Type": "application/json",
 					},
-					Body: err.Error(),
-				}, nil
-			}
-			value, err := op.ValueInterface()
-			if err != nil {
-				return events.APIGatewayProxyResponse{
-					StatusCode: http.StatusBadRequest,
-					Headers: map[string]string{
-						"Content-Type": "application/json",
-					},
-					Body: err.Error(),
-				}, nil
-			}
-
-			switch path {
-			case "/name":
-				updateParts = append(updateParts, "name = ?")
-				updateArgs = append(updateArgs, value)
-			case "/email":
-				updateParts = append(updateParts, "email = ?")
-				updateArgs = append(updateArgs, value)
-			case "/roles":
-				updateParts = append(updateParts, "roles = ?")
-				updateArgs = append(updateArgs, sql.NullString{String: value.(string), Valid: true})
-			}
-		}
-
-		if len(updateParts) > 0 {
-			query := fmt.Sprintf("UPDATE users SET %s WHERE id = ?", strings.Join(updateParts, ", "))
-			updateArgs = append(updateArgs, userId)
-
-			_, err = db.ExecContext(context.Background(), query, updateArgs...)
-			if err != nil {
-			}
-
-			updatedUser, err := queries.GetUser(context.Background(), int64(userId))
-			if err != nil {
-				return events.APIGatewayProxyResponse{
-					StatusCode: http.StatusInternalServerError,
-					Headers: map[string]string{
-						"Content-Type": "application/json",
-					},
-					Body: err.Error(),
-				}, nil
-			}
-			type userJson struct {
-				ID    int64  `json:"id"`
-				Name  string `json:"name"`
-				Email string `json:"email"`
-				Roles string `json:"roles"`
-			}
-			var userJsonBody userJson
-			userJsonBody.ID = updatedUser.ID
-			userJsonBody.Name = updatedUser.Name
-			userJsonBody.Email = updatedUser.Email
-			userJsonBody.Roles = updatedUser.Roles.String
-
-			updatedUserJson, err := json.Marshal(userJsonBody)
-			if err != nil {
-				return events.APIGatewayProxyResponse{
-					StatusCode: http.StatusInternalServerError,
-					Headers: map[string]string{
-						"Content-Type": "application/json",
-					},
-					Body: err.Error(),
+					Body: string(updatedUserJson),
 				}, nil
 			}
 
@@ -245,17 +256,58 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 				Headers: map[string]string{
 					"Content-Type": "application/json",
 				},
-				Body: string(updatedUserJson),
+				Body: "",
+			}, nil
+		} else {
+			var updates map[string]interface{}
+			if err := json.Unmarshal([]byte(req.Body), &updates); err != nil {
+				return errorResponse(http.StatusBadRequest, "Invalid JSON"), nil
+			}
+
+			var updateParts []string
+			var args []interface{}
+
+			allowedColumns := map[string]bool{
+				"name":  true,
+				"email": true,
+				"roles": true,
+			}
+
+			for field, value := range updates {
+				if !allowedColumns[field] {
+					continue
+				}
+				updateParts = append(updateParts, fmt.Sprintf("%s = ?", field))
+				args = append(args, value)
+			}
+
+			if len(updateParts) == 0 {
+				return errorResponse(http.StatusBadRequest, "No valid fields to update"), nil
+			}
+
+			query := fmt.Sprintf("UPDATE users SET %s WHERE id = ?", strings.Join(updateParts, ", "))
+			args = append(args, userId)
+
+			_, err = db.ExecContext(context.Background(), query, args...)
+			if err != nil {
+				return errorResponse(http.StatusInternalServerError, "Failed to update user"), nil
+			}
+
+			updatedUser, err := queries.GetUser(context.Background(), userId)
+			if err != nil {
+				return errorResponse(http.StatusInternalServerError, "Failed to get updated user"), nil
+			}
+
+			jsonUser := jsonify(updatedUser)
+
+			return events.APIGatewayProxyResponse{
+				StatusCode: http.StatusOK,
+				Headers: map[string]string{
+					"Content-Type": "application/json",
+				},
+				Body: jsonUser,
 			}, nil
 		}
-
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusOK,
-			Headers: map[string]string{
-				"Content-Type": "application/json",
-			},
-			Body: "",
-		}, nil
 
 	} else if req.HTTPMethod == "DELETE" {
 	} else {
@@ -284,4 +336,21 @@ func jsonify(user any) string {
 		log.Fatal(err)
 	}
 	return string(userJson)
+}
+
+func errorResponse(statusCode int, message string) events.APIGatewayProxyResponse {
+	return events.APIGatewayProxyResponse{
+		StatusCode: statusCode,
+		Headers: map[string]string{
+			"Content-Type": "application/json",
+		},
+		Body: fmt.Sprintf(`{"error": "%s"}`, message),
+	}
+}
+
+func validateUserUpdate(user data.UpdateUserParams) error {
+	if user.Email != "" && !strings.Contains(user.Email, "@") {
+		return fmt.Errorf("invalid email format")
+	}
+	return nil
 }
