@@ -11,11 +11,11 @@ import (
 	"strconv"
 	"strings"
 
-	_ "embed"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	jsonpatch "github.com/evanphx/json-patch"
 	data "github.com/mr-destructive/dummy-json-patch/dummyuser"
+	"github.com/mr-destructive/dummy-json-patch/embedsql"
 	_ "github.com/tursodatabase/libsql-client-go/libsql"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -40,9 +40,6 @@ var (
 	db      *sql.DB
 )
 
-//go:embed schema.sql
-var ddl string
-
 var users = make(map[string]data.User)
 
 func main() {
@@ -63,7 +60,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 	defer db.Close()
 
 	queries = data.New(db)
-	if _, err := db.ExecContext(ctx, ddl); err != nil {
+	if _, err := db.ExecContext(ctx, embedsql.DDL); err != nil {
 		log.Fatal(err)
 	}
 	userIdStr := req.QueryStringParameters["id"]
