@@ -16,7 +16,6 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	jsonpatch "github.com/evanphx/json-patch"
 	data "github.com/mr-destructive/dummy-json-patch/dummyuser"
-	"github.com/mr-destructive/dummy-json-patch/embedsql"
 	_ "github.com/tursodatabase/libsql-client-go/libsql"
 	"golang.org/x/crypto/bcrypt"
 )
