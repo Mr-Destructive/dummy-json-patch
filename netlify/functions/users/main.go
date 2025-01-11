@@ -64,7 +64,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 	defer db.Close()
 
 	queries = data.New(db)
-	if _, err := db.ExecContext(ctx, embedsql.DDL); err != nil {
+	if _, err := db.ExecContext(ctx, ddl); err != nil {
 		log.Fatal(err)
 	}
 	userIdStr := req.QueryStringParameters["id"]
