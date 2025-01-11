@@ -197,9 +197,11 @@ func handlePatch(ctx context.Context, docID int64, body, contentType string) (ev
 					return errorResponse(http.StatusBadRequest, "Invalid value in test operation"), nil
 				}
 				err = handleTest(currentData, pathSegments, value)
+				log.Printf("currentData: %v | err: %v", currentData, err)
 			}
-
+			log.Printf("err: %v", err)
 			if err != nil {
+				log.Printf("err inside: %v", err.Error())
 				return errorResponse(http.StatusBadRequest, err.Error()), nil
 			}
 		}
@@ -302,6 +304,7 @@ func handleCopy(data map[string]interface{}, from, to []string) error {
 func handleTest(data map[string]interface{}, path []string, value interface{}) error {
 	log.Printf("Data: %v Path: %v", data, path)
 	currentValue, err := getNestedValue(data, path)
+	log.Printf("Current Value: %v | Error: %v", currentValue, err)
 	if err != nil {
 		return fmt.Errorf("test path not found: %s", strings.Join(path, "/"))
 	}
