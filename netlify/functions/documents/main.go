@@ -40,7 +40,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 	if err != nil {
 		return errorResponse(http.StatusInternalServerError, "Database connection failed"), nil
 	}
-	defer sqlDB.Close()
+	defer db.Close()
 
 	queries = data.New(db)
 	if _, err := db.ExecContext(ctx, embedsql.DDL); err != nil {
