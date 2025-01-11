@@ -10,6 +10,17 @@ import (
 	"database/sql"
 )
 
+const createDocument = `-- name: CreateDocument :one
+INSERT INTO document (data) VALUES (?) RETURNING id
+`
+
+func (q *Queries) CreateDocument(ctx context.Context, data sql.NullString) (int64, error) {
+	row := q.db.QueryRowContext(ctx, createDocument, data)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (name, email, bio, roles, password_hash) VALUES (?, ?, ?, ?, ?) RETURNING id, name, email, bio, roles
 `
@@ -49,6 +60,15 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 	return i, err
 }
 
+const deleteDocument = `-- name: DeleteDocument :exec
+DELETE FROM document WHERE id = ?
+`
+
+func (q *Queries) DeleteDocument(ctx context.Context, id int64) error {
+	_, err := q.db.ExecContext(ctx, deleteDocument, id)
+	return err
+}
+
 const deleteUser = `-- name: DeleteUser :exec
 DELETE FROM users WHERE id = ?
 `
@@ -56,6 +76,17 @@ DELETE FROM users WHERE id = ?
 func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, deleteUser, id)
 	return err
+}
+
+const getDocument = `-- name: GetDocument :one
+SELECT data FROM document WHERE id = ?
+`
+
+func (q *Queries) GetDocument(ctx context.Context, id int64) (sql.NullString, error) {
+	row := q.db.QueryRowContext(ctx, getDocument, id)
+	var data sql.NullString
+	err := row.Scan(&data)
+	return data, err
 }
 
 const getUser = `-- name: GetUser :one
@@ -81,6 +112,33 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (GetUserRow, error) {
 		&i.Roles,
 	)
 	return i, err
+}
+
+const listDocuments = `-- name: ListDocuments :many
+SELECT id, data FROM document
+`
+
+func (q *Queries) ListDocuments(ctx context.Context) ([]Document, error) {
+	rows, err := q.db.QueryContext(ctx, listDocuments)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Document
+	for rows.Next() {
+		var i Document
+		if err := rows.Scan(&i.ID, &i.Data); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listUsers = `-- name: ListUsers :many
@@ -122,6 +180,20 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateDocument = `-- name: UpdateDocument :exec
+UPDATE document SET data = ? WHERE id = ?
+`
+
+type UpdateDocumentParams struct {
+	Data sql.NullString
+	ID   int64
+}
+
+func (q *Queries) UpdateDocument(ctx context.Context, arg UpdateDocumentParams) error {
+	_, err := q.db.ExecContext(ctx, updateDocument, arg.Data, arg.ID)
+	return err
 }
 
 const updateUser = `-- name: UpdateUser :exec

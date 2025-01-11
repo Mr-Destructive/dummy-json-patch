@@ -12,3 +12,18 @@ SELECT id, name, email, bio, roles from users;
 
 -- name: DeleteUser :exec
 DELETE FROM users WHERE id = ?;
+
+-- name: GetDocument :one
+SELECT data FROM document WHERE id = ?;
+
+-- name: ListDocuments :many
+SELECT id, data FROM document;
+
+-- name: CreateDocument :one
+INSERT INTO document (data) VALUES (?) RETURNING id;
+
+-- name: UpdateDocument :exec
+UPDATE document SET data = ? WHERE id = ?;
+
+-- name: DeleteDocument :exec
+DELETE FROM document WHERE id = ?;

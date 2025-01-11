@@ -8,6 +8,11 @@ import (
 	"database/sql"
 )
 
+type Document struct {
+	ID   int64
+	Data sql.NullString
+}
+
 type User struct {
 	ID           int64
 	Name         string

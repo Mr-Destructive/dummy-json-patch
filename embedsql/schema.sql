@@ -6,3 +6,8 @@ CREATE TABLE IF NOT EXISTS users (
     roles TEXT,
     password_hash TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS document (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    data TEXT
+)
