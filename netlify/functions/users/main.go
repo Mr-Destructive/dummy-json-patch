@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	_ "embed"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	jsonpatch "github.com/evanphx/json-patch"
@@ -39,6 +40,9 @@ var (
 	queries *data.Queries
 	db      *sql.DB
 )
+
+//go:embed schema.sql
+var ddl string
 
 var users = make(map[string]data.User)
 
