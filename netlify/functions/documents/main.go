@@ -300,6 +300,7 @@ func handleCopy(data map[string]interface{}, from, to []string) error {
 }
 
 func handleTest(data map[string]interface{}, path []string, value interface{}) error {
+	log.Printf("Data: %v Path: %v", data, path)
 	currentValue, err := getNestedValue(data, path)
 	if err != nil {
 		return fmt.Errorf("test path not found: %s", strings.Join(path, "/"))
@@ -351,6 +352,7 @@ func removeNestedValue(data map[string]interface{}, path []string) error {
 
 func getNestedValue(data map[string]interface{}, path []string) (interface{}, error) {
 	current := data
+	log.Printf("current: %v", current)
 	for i := 0; i < len(path)-1; i++ {
 		next, ok := current[path[i]].(map[string]interface{})
 		log.Printf("next: %v, ok: %v", next, ok)
