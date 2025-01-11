@@ -353,12 +353,14 @@ func getNestedValue(data map[string]interface{}, path []string) (interface{}, er
 	current := data
 	for i := 0; i < len(path)-1; i++ {
 		next, ok := current[path[i]].(map[string]interface{})
+		log.Printf("next: %v, ok: %v", next, ok)
 		if !ok {
 			return nil, fmt.Errorf("path not found: %s", strings.Join(path[:i+1], "/"))
 		}
 		current = next
 	}
 	value, exists := current[path[len(path)-1]]
+	log.Printf("value: %v, exists: %v", value, exists)
 	if !exists {
 		return nil, fmt.Errorf("path not found: %s", strings.Join(path, "/"))
 	}
