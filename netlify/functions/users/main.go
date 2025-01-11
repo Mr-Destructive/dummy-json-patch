@@ -23,6 +23,7 @@ import (
 type UserPayload struct {
 	Name     string `json:"name"`
 	Email    string `json:"email"`
+	Bio      string `json:"bio"`
 	Roles    string `json:"roles"`
 	Password string `json:"password"`
 }
@@ -30,6 +31,7 @@ type UserPayload struct {
 type UserUpdatePayload struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`
+	Bio   string `json:"bio"`
 	Roles string `json:"roles"`
 }
 
@@ -120,6 +122,10 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		user, err := queries.CreateUser(context.Background(), data.CreateUserParams{
 			Name:  userPayload.Name,
 			Email: userPayload.Email,
+			Bio: sql.NullString{
+				String: userPayload.Bio,
+				Valid:  true,
+			},
 			Roles: sql.NullString{
 				String: userPayload.Roles,
 				Valid:  true,
@@ -148,6 +154,10 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		if err := validateUserUpdate(data.UpdateUserParams{
 			Name:  userPayload.Name,
 			Email: userPayload.Email,
+			Bio: sql.NullString{
+				String: userPayload.Bio,
+				Valid:  true,
+			},
 			Roles: sql.NullString{
 				String: userPayload.Roles,
 				Valid:  true,
@@ -159,6 +169,10 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 			ID:    userId,
 			Name:  userPayload.Name,
 			Email: userPayload.Email,
+			Bio: sql.NullString{
+				String: userPayload.Bio,
+				Valid:  true,
+			},
 			Roles: sql.NullString{
 				String: userPayload.Roles,
 				Valid:  true,
@@ -197,6 +211,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 			allowedPaths := map[string]struct{}{
 				"/name":  {},
 				"/email": {},
+				"/bio":   {},
 				"/roles": {},
 			}
 
@@ -236,6 +251,14 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 						return errorResponse(http.StatusBadRequest, "Invalid email format"), nil
 					}
 					updateParts = append(updateParts, "email = ?")
+					updateArgs = append(updateArgs, strValue)
+
+				case "/bio":
+					strValue, ok := value.(string)
+					if !ok || strValue == "" {
+						return errorResponse(http.StatusBadRequest, "Bio must be a non-empty string"), nil
+					}
+					updateParts = append(updateParts, "bio = ?")
 					updateArgs = append(updateArgs, strValue)
 
 				case "/roles":
@@ -286,6 +309,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 			allowedColumns := map[string]bool{
 				"name":  true,
 				"email": true,
+				"bio":   true,
 				"roles": true,
 			}
 
@@ -350,7 +374,6 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 			Body: "Method not allowed",
 		}, nil
 	}
-
 }
 
 func jsonify(user any) string {
@@ -383,11 +406,13 @@ func formatUserResponse(user data.GetUserRow) []byte {
 		ID    int64  `json:"id"`
 		Name  string `json:"name"`
 		Email string `json:"email"`
+		Bio   string `json:"bio"`
 		Roles string `json:"roles"`
 	}{
 		ID:    user.ID,
 		Name:  user.Name,
 		Email: user.Email,
+		Bio:   user.Bio.String,
 		Roles: user.Roles.String,
 	}
 

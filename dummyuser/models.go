@@ -12,6 +12,7 @@ type User struct {
 	ID           int64
 	Name         string
 	Email        string
+	Bio          sql.NullString
 	Roles        sql.NullString
 	PasswordHash string
 }

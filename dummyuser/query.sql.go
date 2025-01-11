@@ -11,30 +11,40 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (name, email, roles, password_hash) VALUES (?, ?, ?, ?) RETURNING id, name, email, roles, password_hash
+INSERT INTO users (name, email, bio, roles, password_hash) VALUES (?, ?, ?, ?, ?) RETURNING id, name, email, bio, roles
 `
 
 type CreateUserParams struct {
 	Name         string
 	Email        string
+	Bio          sql.NullString
 	Roles        sql.NullString
 	PasswordHash string
 }
 
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+type CreateUserRow struct {
+	ID    int64
+	Name  string
+	Email string
+	Bio   sql.NullString
+	Roles sql.NullString
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
 	row := q.db.QueryRowContext(ctx, createUser,
 		arg.Name,
 		arg.Email,
+		arg.Bio,
 		arg.Roles,
 		arg.PasswordHash,
 	)
-	var i User
+	var i CreateUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.Email,
+		&i.Bio,
 		&i.Roles,
-		&i.PasswordHash,
 	)
 	return i, err
 }
@@ -49,13 +59,14 @@ func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, name, email, roles FROM users WHERE id = ?
+SELECT id, name, email, bio, roles FROM users WHERE id = ?
 `
 
 type GetUserRow struct {
 	ID    int64
 	Name  string
 	Email string
+	Bio   sql.NullString
 	Roles sql.NullString
 }
 
@@ -66,19 +77,21 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (GetUserRow, error) {
 		&i.ID,
 		&i.Name,
 		&i.Email,
+		&i.Bio,
 		&i.Roles,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, name, email, roles from users
+SELECT id, name, email, bio, roles from users
 `
 
 type ListUsersRow struct {
 	ID    int64
 	Name  string
 	Email string
+	Bio   sql.NullString
 	Roles sql.NullString
 }
 
@@ -95,6 +108,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 			&i.ID,
 			&i.Name,
 			&i.Email,
+			&i.Bio,
 			&i.Roles,
 		); err != nil {
 			return nil, err
@@ -111,12 +125,13 @@ func (q *Queries) ListUsers(ctx context.Context) ([]ListUsersRow, error) {
 }
 
 const updateUser = `-- name: UpdateUser :exec
-UPDATE users SET name = ?, email = ?, roles = ? WHERE id = ?
+UPDATE users SET name = ?, email = ?, bio = ?, roles = ?  WHERE id = ?
 `
 
 type UpdateUserParams struct {
 	Name  string
 	Email string
+	Bio   sql.NullString
 	Roles sql.NullString
 	ID    int64
 }
@@ -125,6 +140,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
 	_, err := q.db.ExecContext(ctx, updateUser,
 		arg.Name,
 		arg.Email,
+		arg.Bio,
 		arg.Roles,
 		arg.ID,
 	)

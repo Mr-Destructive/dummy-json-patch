@@ -243,11 +243,9 @@ func errorResponse(statusCode int, message string) events.APIGatewayProxyRespons
 	}
 }
 
-// Validation helper
 func validateUserUpdate(user data.UpdateUserParams) error {
-	if user.Email != nil && !isValidEmail(*user.Email) {
+	if user.Email != "" && !strings.Contains(user.Email, "@") {
 		return fmt.Errorf("invalid email format")
 	}
-	// Add other validation as needed
 	return nil
 }
