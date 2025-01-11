@@ -151,81 +151,69 @@ func handlePatch(ctx context.Context, docID int64, body, contentType string) (ev
 		}
 
 		for _, op := range patchOps {
-			path, err := op.Path()
-			if err != nil {
-				return errorResponse(http.StatusBadRequest, fmt.Sprintf("Invalid path in operation: %v", err)), nil
+			path, pathErr := op.Path()
+			if pathErr != nil {
+				return errorResponse(http.StatusBadRequest, fmt.Sprintf("Invalid path in operation: %v", pathErr)), nil
 			}
 			pathSegments := strings.Split(strings.TrimPrefix(path, "/"), "/")
 
+			var opErr error
 			switch op.Kind() {
 			case "add":
-				value, err := op.ValueInterface()
-				if err != nil {
+				value, valueErr := op.ValueInterface()
+				if valueErr != nil {
 					return errorResponse(http.StatusBadRequest, "Invalid value in add operation"), nil
 				}
-				err = handleAdd(currentData, pathSegments, value)
+				opErr = handleAdd(currentData, pathSegments, value)
 
 			case "remove":
-				err = handleRemove(currentData, pathSegments)
+				opErr = handleRemove(currentData, pathSegments)
 
 			case "replace":
-				value, err := op.ValueInterface()
-				if err != nil {
+				value, valueErr := op.ValueInterface()
+				if valueErr != nil {
 					return errorResponse(http.StatusBadRequest, "Invalid value in replace operation"), nil
 				}
-				err = handleReplace(currentData, pathSegments, value)
+				opErr = handleReplace(currentData, pathSegments, value)
 
 			case "move":
-				from, err := getFromPath(op)
-				if err != nil {
+				from, fromErr := getFromPath(op)
+				if fromErr != nil {
 					return errorResponse(http.StatusBadRequest, "Invalid from path in move operation"), nil
 				}
 				fromSegments := strings.Split(strings.TrimPrefix(from, "/"), "/")
-				err = handleMove(currentData, fromSegments, pathSegments)
+				opErr = handleMove(currentData, fromSegments, pathSegments)
 
 			case "copy":
-				from, err := getFromPath(op)
-				if err != nil {
+				from, fromErr := getFromPath(op)
+				if fromErr != nil {
 					return errorResponse(http.StatusBadRequest, "Invalid from path in copy operation"), nil
 				}
 				fromSegments := strings.Split(strings.TrimPrefix(from, "/"), "/")
-				err = handleCopy(currentData, fromSegments, pathSegments)
+				opErr = handleCopy(currentData, fromSegments, pathSegments)
 
 			case "test":
-				value, err := op.ValueInterface()
-				if err != nil {
+				value, valueErr := op.ValueInterface()
+				if valueErr != nil {
 					return errorResponse(http.StatusBadRequest, "Invalid value in test operation"), nil
 				}
-				err = handleTest(currentData, pathSegments, value)
-				log.Printf("currentData: %v | err: %v", currentData, err)
+				opErr = handleTest(currentData, pathSegments, value)
+				log.Printf("currentData: %v | opErr: %v", currentData, opErr)
 			}
-			log.Printf("err: %v", err)
-			if err != nil {
-				log.Printf("err inside: %v", err.Error())
-				return errorResponse(http.StatusBadRequest, err.Error()), nil
+			log.Printf("opErr: %v", opErr)
+			if opErr != nil {
+				log.Printf("opErr inside: %v", opErr.Error())
+				return errorResponse(http.StatusBadRequest, opErr.Error()), nil
 			}
 		}
-
-		updatedJSON, err := json.Marshal(currentData)
+		jsonData, err := json.Marshal(currentData)
 		if err != nil {
-			return errorResponse(http.StatusInternalServerError, "Failed to marshal updated document"), nil
+			return errorResponse(http.StatusInternalServerError, "Failed to marshal JSON"), nil
 		}
-
-		err = queries.UpdateDocument(ctx, data.UpdateDocumentParams{
-			ID: docID,
-			Data: sql.NullString{
-				String: string(updatedJSON),
-				Valid:  true,
-			},
+		return handleMergePatch(ctx, docID, string(jsonData), data.Document{
+			ID:   docID,
+			Data: sql.NullString{String: string(jsonData), Valid: true},
 		})
-		if err != nil {
-			return errorResponse(http.StatusInternalServerError, "Failed to update document"), nil
-		}
-
-		return jsonResponse(http.StatusOK, map[string]interface{}{
-			"id":   docID,
-			"data": currentData,
-		}), nil
 	} else {
 		return handleMergePatch(ctx, docID, body, data.Document{
 			ID:   docID,
